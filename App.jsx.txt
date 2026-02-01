@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crumbly - Sourdough Scheduler</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Babel Standalone (Stable version) -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="module">
+      import React from 'https://esm.sh/react@18.2.0';
+      import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+
+      async function init() {
+        try {
+          // Use a direct relative fetch which is more resilient to varying browser environments
+          const response = await fetch('App.jsx');
+          if (!response.ok) throw new Error(`Could not find App.jsx in the current folder.`);
+          let code = await response.text();
+
+          // 1. Pre-process imports for browser compatibility
+          // Remove the lucide-react import because we will load it via esm.sh inside the transpiled code
+          code = code.replace(
+            /import\s+.*\s+from\s+['"]lucide-react['"];?/g, 
+            "import { Clock, Plus, ChevronRight, Save, ArrowLeft, ChefHat, Timer, Trash2, ListChecks, Info, Bell, BellOff, CheckCircle2 } from 'https://esm.sh/lucide-react@0.284.0?external=react';"
+          );
+
+          // 2. Transpile JSX using Babel
+          // We wrap this in a try-catch to catch specific Babel syntax errors
+          let transformed;
+          try {
+            transformed = Babel.transform(code, {
+              presets: ['react'],
+              filename: 'App.jsx'
+            }).code;
+          } catch (babelErr) {
+            throw new Error(`Babel Transform Error: ${babelErr.message}`);
+          }
+
+          // 3. Create a blob and execute
+          const scriptBlob = new Blob([transformed], { type: 'application/javascript' });
+          const scriptUrl = URL.createObjectURL(scriptBlob);
+          
+          const module = await import(scriptUrl);
+          const App = module.default;
+
+          if (!App) throw new Error("App.jsx does not have a 'export default function App' line.");
+
+          const root = ReactDOM.createRoot(document.getElementById('root'));
+          root.render(React.createElement(App));
+
+        } catch (err) {
+          console.error("Initialization error:", err);
+          const rootDiv = document.getElementById('root');
+          if (rootDiv) {
+            rootDiv.innerHTML = `
+              <div style="padding: 24px; color: #b91c1c; font-family: system-ui, -apple-system, sans-serif; background: #fef2f2; border-radius: 12px; border: 1px solid #fee2e2; margin: 20px; max-width: 600px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <h2 style="margin-top: 0; font-size: 1.25rem; font-weight: 700;">Crumbly Startup Error</h2>
+                <p style="font-size: 14px; line-height: 1.5;"><strong>Details:</strong> ${err.message}</p>
+                <div style="font-size: 13px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #fecaca; color: #7f1d1d;">
+                  <p style="font-weight: 600; margin-bottom: 8px;">Common fixes:</p>
+                  <ul style="padding-left: 20px; margin: 0;">
+                    <li>Ensure <strong>index.html</strong> and <strong>App.jsx</strong> are in the same folder.</li>
+                    <li>If testing on your computer, you must use a local server (like the "Live Server" extension in VS Code). Opening the file directly via <code>file://</code> usually blocks the code for security.</li>
+                    <li>Once you upload these files to GitHub and connect to Vercel, it will work automatically.</li>
+                  </ul>
+                </div>
+              </div>
+            `;
+          }
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
